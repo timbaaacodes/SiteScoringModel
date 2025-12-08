@@ -621,12 +621,9 @@
             L.rectangle([
                 [ABQ_BOUNDS.minLat, ABQ_BOUNDS.minLon],
                 [ABQ_BOUNDS.maxLat, ABQ_BOUNDS.maxLon]
-            ], {
-                color: '#ff7800',
-                weight: 3,
-                fillOpacity: 0.05,
-                dashArray: '10, 10'
-            }).bindPopup('<b>Albuquerque Focus Area</b><br>Scoring calculated within this boundary')
+            ], {color: '#888888', weight: 1, fillOpacity: 0.02 }
+                       )
+                .bindPopup('<b>Albuquerque Focus Area</b><br>Scoring calculated within this boundary')
               .addTo(overlayLayers.abqBoundary);
         }
         
