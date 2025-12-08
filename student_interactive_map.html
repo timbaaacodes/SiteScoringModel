@@ -1,0 +1,886 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Albuquerque Site Selection - Interactive Model</title>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <!-- MarkerCluster CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+    
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <!-- MarkerCluster JS -->
+    <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+    
+    <!-- Heatmap JS -->
+    <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+    
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        #map {
+            height: 100vh;
+            width: 100%;
+        }
+        
+        /* Weight Control Panel */
+        .weight-control {
+            position: absolute;
+            bottom: 50px;
+            left: 10px;
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            z-index: 1000;
+            max-width: 320px;
+            max-height: 70vh;
+            overflow-y: auto;
+        }
+        
+        @media (max-width: 768px) {
+            .weight-control {
+                position: fixed;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                top: auto;
+                max-width: 100%;
+                border-radius: 20px 20px 0 0;
+                max-height: 50vh;
+            }
+        }
+        
+        .weight-control h2 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+        
+        .slider-group {
+            margin-bottom: 12px;
+        }
+        
+        .slider-group label {
+            display: block;
+            margin-bottom: 3px;
+            color: #34495e;
+            font-size: 13px;
+            font-weight: 600;
+        }
+        
+        .slider-group input[type="range"] {
+            width: 100%;
+            margin-bottom: 5px;
+        }
+        
+        .slider-value {
+            display: inline-block;
+            background: #ecf0f1;
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 12px;
+            float: right;
+        }
+        
+        .weight-sum {
+            text-align: center;
+            padding: 10px;
+            margin: 15px 0;
+            border-radius: 5px;
+            font-weight: bold;
+            font-size: 16px;
+        }
+        
+        .weight-sum.valid {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .weight-sum.invalid {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .update-button {
+            width: 100%;
+            padding: 12px;
+            background: #3498db;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        
+        .update-button:hover {
+            background: #2980b9;
+        }
+        
+        .update-button:disabled {
+            background: #95a5a6;
+            cursor: not-allowed;
+        }
+        
+        .info-box {
+            background: #e3f2fd;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            font-size: 12px;
+            color: #1565c0;
+        }
+        
+        .legend {
+            background: white;
+            padding: 15px;
+            border-radius: 5px;
+            box-shadow: 0 0 15px rgba(0,0,0,0.2);
+            line-height: 18px;
+            color: #555;
+        }
+        
+        .legend h4 {
+            margin: 0 0 10px;
+            font-size: 14px;
+        }
+        
+        .legend i {
+            width: 18px;
+            height: 18px;
+            float: left;
+            margin-right: 8px;
+            opacity: 0.7;
+        }
+        
+        .loading {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 20px 40px;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.3);
+            z-index: 10000;
+            font-size: 18px;
+        }
+    </style>
+</head>
+<body>
+    <div id="loading" class="loading">Loading map data...</div>
+    <div id="map"></div>
+    
+    <!-- Weight Control Panel -->
+    <div class="weight-control">
+        <h2>🎓 Student Model Explorer</h2>
+        
+        <div class="info-box">
+            <strong>🎯 Focus Area: Albuquerque</strong><br>
+            Adjust weights to see how scoring changes in real-time!
+        </div>
+        
+        <div class="slider-group">
+            <label>
+                Fast Food (Agglomeration)
+                <span class="slider-value" id="val-fastfood">0.30</span>
+            </label>
+            <input type="range" id="weight-fastfood" min="0" max="1" step="0.01" value="0.30">
+        </div>
+        
+        <div class="slider-group">
+            <label>
+                Highway (Access)
+                <span class="slider-value" id="val-highway">0.30</span>
+            </label>
+            <input type="range" id="weight-highway" min="0" max="1" step="0.01" value="0.30">
+        </div>
+        
+        <div class="slider-group">
+            <label>
+                Traffic Volume
+                <span class="slider-value" id="val-traffic">0.23</span>
+            </label>
+            <input type="range" id="weight-traffic" min="0" max="1" step="0.01" value="0.23">
+        </div>
+        
+        <div class="slider-group">
+            <label>
+                Diversity Index
+                <span class="slider-value" id="val-diversity">0.07</span>
+            </label>
+            <input type="range" id="weight-diversity" min="0" max="1" step="0.01" value="0.07">
+        </div>
+        
+        <div class="slider-group">
+            <label>
+                POI (Magnets)
+                <span class="slider-value" id="val-poi">0.10</span>
+            </label>
+            <input type="range" id="weight-poi" min="0" max="1" step="0.01" value="0.10">
+        </div>
+        
+        <div class="slider-group">
+            <label>
+                Score Threshold
+                <span class="slider-value" id="val-threshold">0.50</span>
+            </label>
+            <input type="range" id="threshold-slider" min="0" max="1" step="0.01" value="0.50">
+        </div>
+        
+        <div class="weight-sum" id="weightSum">Weight Sum: 1.00</div>
+        
+        <button class="update-button" id="updateButton" onclick="recalculateScores()">
+            🔄 Recalculate Scores
+        </button>
+        
+        <div style="margin-top: 10px; font-size: 11px; color: #7f8c8d; text-align: center;">
+            Calculation takes ~2-5 seconds
+        </div>
+    </div>
+    
+    <script>
+        // ============================================
+        // ALBUQUERQUE FOCUS AREA
+        // ============================================
+        
+        const ABQ_BOUNDS = {
+            minLat: 34.9,
+            maxLat: 35.3,
+            minLon: -106.8,
+            maxLon: -106.4
+        };
+        
+        const ABQ_CENTER = [35.0844, -106.6504];
+        
+        const CONFIG = {
+            RESOLUTION: 0.02,  // ~2km grid (smaller = more points, slower)
+            DECAY_K: 0.05,
+            DISTRIBUTION_CENTERS: [
+                {lat: 39.09820436455732, lon: -104.78195183701729, name: 'Denver, CO'},
+                {lat: 33.54855180837709, lon: -112.00158827551459, name: 'Phoenix, AZ'}
+            ],
+            DC_RADIUS_KM: 300 * 1.609,
+            TRAFFIC_MIN_THRESHOLD: 5000
+        };
+        
+        // Global data storage (filtered to Albuquerque)
+        let abqData = {
+            fastFood: [],
+            highways: [],
+            pois: [],
+            trafficStations: [],
+            roadTraffic: [],
+            diversity: []
+        };
+        
+        // ============================================
+        // INITIALIZE MAP
+        // ============================================
+        
+        const map = L.map('map', {
+            center: ABQ_CENTER,
+            zoom: 11
+        });
+        
+        const baseLayers = {
+            "Street Map": L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors',
+                maxZoom: 19
+            }),
+            "Dark Base Map": L.tileLayer('https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}{r}.png', {
+                attribution: '© Stadia Maps',
+                maxZoom: 20
+            })
+        };
+        
+        baseLayers["Street Map"].addTo(map);
+        
+        const overlayLayers = {
+            stateBoundary: L.featureGroup(),
+            streetNetwork: L.featureGroup(),
+            fastFood: L.markerClusterGroup({
+                showCoverageOnHover: false,
+                zoomToBoundsOnClick: true,
+                spiderfyOnMaxZoom: true,
+                disableClusteringAtZoom: 15
+            }),
+            poisMallsUnis: L.markerClusterGroup({
+                showCoverageOnHover: false,
+                zoomToBoundsOnClick: true
+            }),
+            trafficStations: L.markerClusterGroup({
+                showCoverageOnHover: false
+            }),
+            avgTraffic: L.featureGroup(),
+            dcRadius: L.featureGroup().addTo(map),
+            diversityData: L.featureGroup(),
+            abqBoundary: L.featureGroup().addTo(map),
+            scoringMap: L.featureGroup().addTo(map),
+            topLocations: L.featureGroup().addTo(map)
+        };
+        
+        // ============================================
+        // HELPER FUNCTIONS
+        // ============================================
+        
+        function isInAlbuquerque(lat, lon) {
+            return lat >= ABQ_BOUNDS.minLat && lat <= ABQ_BOUNDS.maxLat &&
+                   lon >= ABQ_BOUNDS.minLon && lon <= ABQ_BOUNDS.maxLon;
+        }
+        
+        function getTrafficColor(traffic) {
+            if (traffic > 50000) return '#dc2626';
+            if (traffic > 20000) return '#ea580c';
+            if (traffic > 10000) return '#f59e0b';
+            if (traffic > 5000) return '#84cc16';
+            if (traffic > 1000) return '#22c55e';
+            return '#6e8ab7';
+        }
+        
+        function getTrafficWeight(traffic) {
+            if (traffic > 50000) return 5;
+            if (traffic > 20000) return 4;
+            if (traffic > 10000) return 3;
+            return 2;
+        }
+        
+        function haversineDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371;
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                     Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                     Math.sin(dLon/2) * Math.sin(dLon/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return R * c;
+        }
+        
+        function minDistanceToPoints(lat, lon, points) {
+            let minDist = Infinity;
+            for (const point of points) {
+                const dist = haversineDistance(lat, lon, point.lat, point.lon);
+                if (dist < minDist) minDist = dist;
+            }
+            return minDist === Infinity ? 100 : minDist;
+        }
+        
+        function minDistanceToLines(lat, lon, lines) {
+            let minDist = Infinity;
+            for (const line of lines) {
+                for (const point of line) {
+                    const dist = haversineDistance(lat, lon, point.lat, point.lon);
+                    if (dist < minDist) minDist = dist;
+                }
+            }
+            return minDist === Infinity ? 100 : minDist;
+        }
+        
+        // ============================================
+        // DATA LOADING (FILTERED TO ALBUQUERQUE)
+        // ============================================
+        
+        async function loadFastFoodLocations() {
+            try {
+                const response = await fetch('fast_food_locations.json');
+                if (!response.ok) throw new Error('Fast food data not found');
+                
+                const allLocations = await response.json();
+                
+                // Filter to Albuquerque
+                abqData.fastFood = allLocations.filter(loc => 
+                    isInAlbuquerque(loc.lat, loc.lon)
+                );
+                
+                abqData.fastFood.forEach(loc => {
+                    const marker = L.marker([loc.lat, loc.lon], {
+                        icon: L.divIcon({
+                            html: '<i class="fas fa-utensils" style="color: red; font-size: 16px;"></i>',
+                            className: 'custom-div-icon',
+                            iconSize: [20, 20],
+                            iconAnchor: [10, 10]
+                        })
+                    });
+                    marker.bindPopup(`<b>${loc.name}</b><br>Rating: ${loc.rating || 'N/A'}`);
+                    overlayLayers.fastFood.addLayer(marker);
+                });
+                
+                console.log(`✓ Fast Food in ABQ: ${abqData.fastFood.length} locations`);
+            } catch (e) {
+                console.log('Fast food data not available');
+            }
+        }
+        
+        async function loadHighways() {
+            try {
+                const response = await fetch('highways.geojson');
+                if (!response.ok) throw new Error('Highway data not found');
+                
+                const data = await response.json();
+                
+                // Extract line coordinates in ABQ
+                data.features.forEach(feature => {
+                    if (feature.geometry.type === 'LineString') {
+                        const coords = feature.geometry.coordinates;
+                        const abqCoords = coords.filter(coord => 
+                            isInAlbuquerque(coord[1], coord[0])
+                        );
+                        if (abqCoords.length > 0) {
+                            abqData.highways.push(abqCoords.map(c => ({lat: c[1], lon: c[0]})));
+                        }
+                    }
+                });
+                
+                // Display highways
+                L.geoJSON(data, {
+                    style: {
+                        color: '#5f6268',
+                        weight: 1,
+                        opacity: 0.5
+                    },
+                    filter: function(feature) {
+                        // Only show if intersects ABQ
+                        if (feature.geometry.type === 'LineString') {
+                            return feature.geometry.coordinates.some(coord =>
+                                isInAlbuquerque(coord[1], coord[0])
+                            );
+                        }
+                        return false;
+                    }
+                }).addTo(overlayLayers.streetNetwork);
+                
+                console.log(`✓ Highways in ABQ: ${abqData.highways.length} segments`);
+            } catch (e) {
+                console.log('Highway data not available');
+            }
+        }
+        
+        async function loadPOIs() {
+            try {
+                const response = await fetch('poi_locations.json');
+                if (!response.ok) throw new Error('POI data not found');
+                
+                const allPOIs = await response.json();
+                
+                // Filter to Albuquerque
+                abqData.pois = allPOIs.filter(poi => 
+                    isInAlbuquerque(poi.lat, poi.lon)
+                );
+                
+                abqData.pois.forEach(poi => {
+                    const marker = L.marker([poi.lat, poi.lon], {
+                        icon: L.divIcon({
+                            html: '<i class="fas fa-circle-dot" style="color: purple; font-size: 14px;"></i>',
+                            className: 'custom-div-icon',
+                            iconSize: [20, 20],
+                            iconAnchor: [10, 10]
+                        })
+                    });
+                    marker.bindPopup(`<b>${poi.name}</b>`);
+                    overlayLayers.poisMallsUnis.addLayer(marker);
+                });
+                
+                console.log(`✓ POIs in ABQ: ${abqData.pois.length} locations`);
+            } catch (e) {
+                console.log('POI data not available');
+            }
+        }
+        
+        async function loadTrafficStations() {
+            try {
+                const response = await fetch('traffic_stations.json');
+                if (!response.ok) throw new Error('Traffic stations not found');
+                
+                const allStations = await response.json();
+                
+                // Filter to Albuquerque
+                abqData.trafficStations = allStations.filter(station => 
+                    isInAlbuquerque(station.lat, station.lon)
+                );
+                
+                abqData.trafficStations.forEach(station => {
+                    const marker = L.marker([station.lat, station.lon], {
+                        icon: L.divIcon({
+                            html: '<i class="fas fa-taxi" style="color: lightblue; font-size: 16px;"></i>',
+                            className: 'custom-div-icon',
+                            iconSize: [20, 20],
+                            iconAnchor: [10, 10]
+                        })
+                    });
+                    marker.bindPopup(`<b>Traffic Station</b><br>Count: ${station.count.toLocaleString()}`);
+                    overlayLayers.trafficStations.addLayer(marker);
+                });
+                
+                console.log(`✓ Traffic Stations in ABQ: ${abqData.trafficStations.length} stations`);
+            } catch (e) {
+                console.log('Traffic station data not available');
+            }
+        }
+        
+        async function loadRoadTraffic() {
+            try {
+                const response = await fetch('road_traffic.geojson');
+                if (!response.ok) throw new Error('Road traffic not found');
+                
+                const data = await response.json();
+                
+                // Filter and store road traffic data for ABQ
+                data.features.forEach(feature => {
+                    if (feature.geometry.type === 'LineString') {
+                        const coords = feature.geometry.coordinates;
+                        const abqCoords = coords.filter(coord => 
+                            isInAlbuquerque(coord[1], coord[0])
+                        );
+                        if (abqCoords.length > 0) {
+                            const traffic = feature.properties.mean_traffic || feature.properties.traffic;
+                            abqData.roadTraffic.push({
+                                coords: abqCoords.map(c => ({lat: c[1], lon: c[0]})),
+                                traffic: traffic
+                            });
+                        }
+                    }
+                });
+                
+                L.geoJSON(data, {
+                    style: function(feature) {
+                        const traffic = feature.properties.mean_traffic || feature.properties.traffic;
+                        return {
+                            color: getTrafficColor(traffic),
+                            weight: getTrafficWeight(traffic),
+                            opacity: 0.8
+                        };
+                    },
+                    onEachFeature: function(feature, layer) {
+                        const traffic = feature.properties.mean_traffic || feature.properties.traffic;
+                        layer.bindPopup(`<b>Avg. Traffic</b><br>Volume: ${traffic ? traffic.toLocaleString() : 'N/A'} vehicles/day`);
+                    },
+                    filter: function(feature) {
+                        if (feature.geometry.type === 'LineString') {
+                            const hasABQ = feature.geometry.coordinates.some(coord =>
+                                isInAlbuquerque(coord[1], coord[0])
+                            );
+                            const traffic = feature.properties.mean_traffic || feature.properties.traffic;
+                            return hasABQ && traffic > CONFIG.TRAFFIC_MIN_THRESHOLD;
+                        }
+                        return false;
+                    }
+                }).addTo(overlayLayers.avgTraffic);
+                
+                console.log(`✓ Road Traffic in ABQ: ${abqData.roadTraffic.length} segments`);
+            } catch (e) {
+                console.error('Road traffic loading error:', e);
+            }
+        }
+        
+        function loadDistributionCenters() {
+            CONFIG.DISTRIBUTION_CENTERS.forEach((dc, idx) => {
+                L.marker([dc.lat, dc.lon], {
+                    icon: L.divIcon({
+                        html: '<i class="fas fa-truck" style="color: blue; font-size: 20px;"></i>',
+                        className: 'custom-div-icon',
+                        iconSize: [30, 30],
+                        iconAnchor: [15, 15]
+                    })
+                }).bindPopup(`<b>Distribution Center ${idx + 1}</b><br>${dc.name}`)
+                  .addTo(overlayLayers.dcRadius);
+                
+                L.circle([dc.lat, dc.lon], {
+                    radius: CONFIG.DC_RADIUS_KM * 1000,
+                    color: 'blue',
+                    fillColor: '#d84444',
+                    fillOpacity: 0.1,
+                    weight: 2
+                }).addTo(overlayLayers.dcRadius);
+            });
+            
+            console.log('✓ Distribution Centers loaded');
+        }
+        
+        function loadABQBoundary() {
+            // Draw Albuquerque focus boundary
+            L.rectangle([
+                [ABQ_BOUNDS.minLat, ABQ_BOUNDS.minLon],
+                [ABQ_BOUNDS.maxLat, ABQ_BOUNDS.maxLon]
+            ], {
+                color: '#ff7800',
+                weight: 3,
+                fillOpacity: 0.05,
+                dashArray: '10, 10'
+            }).bindPopup('<b>Albuquerque Focus Area</b><br>Scoring calculated within this boundary')
+              .addTo(overlayLayers.abqBoundary);
+        }
+        
+        // ============================================
+        // REAL-TIME SCORING CALCULATION
+        // ============================================
+        
+        function calculateScores(weights, threshold) {
+            console.log('🔄 Calculating scores for Albuquerque...');
+            console.time('Scoring');
+            
+            const gridPoints = [];
+            
+            // Create grid over Albuquerque only
+            for (let lat = ABQ_BOUNDS.minLat; lat < ABQ_BOUNDS.maxLat; lat += CONFIG.RESOLUTION) {
+                for (let lon = ABQ_BOUNDS.minLon; lon < ABQ_BOUNDS.maxLon; lon += CONFIG.RESOLUTION) {
+                    gridPoints.push({lat, lon});
+                }
+            }
+            
+            console.log(`Grid size: ${gridPoints.length} points`);
+            
+            const scores = [];
+            
+            // Calculate score for each grid point
+            gridPoints.forEach((point, idx) => {
+                // 1. Fast Food proximity
+                const ffDist = minDistanceToPoints(point.lat, point.lon, abqData.fastFood);
+                const ffScore = Math.exp(-CONFIG.DECAY_K * ffDist);
+                
+                // 2. Highway proximity
+                const hwDist = minDistanceToLines(point.lat, point.lon, abqData.highways);
+                const hwScore = Math.exp(-CONFIG.DECAY_K * hwDist);
+                
+                // 3. Traffic score (weighted by traffic volume)
+                let trafficScore = 0;
+                if (abqData.roadTraffic.length > 0) {
+                    let closestTrafficDist = Infinity;
+                    let closestTrafficValue = 0;
+                    
+                    for (const road of abqData.roadTraffic) {
+                        for (const coord of road.coords) {
+                            const dist = haversineDistance(point.lat, point.lon, coord.lat, coord.lon);
+                            if (dist < closestTrafficDist) {
+                                closestTrafficDist = dist;
+                                closestTrafficValue = road.traffic;
+                            }
+                        }
+                    }
+                    
+                    // Normalize traffic (assuming max ~100,000)
+                    const normalizedTraffic = Math.min(closestTrafficValue / 100000, 1);
+                    trafficScore = Math.exp(-CONFIG.DECAY_K * closestTrafficDist) * normalizedTraffic;
+                }
+                
+                // 4. Diversity score (simplified - uniform for now)
+                const divScore = 0.5;
+                
+                // 5. POI proximity
+                const poiDist = minDistanceToPoints(point.lat, point.lon, abqData.pois);
+                const poiScore = Math.exp(-CONFIG.DECAY_K * poiDist);
+                
+                // Calculate weighted final score
+                const finalScore = 
+                    weights.fastfood * ffScore +
+                    weights.highway * hwScore +
+                    weights.traffic * trafficScore +
+                    weights.diversity * divScore +
+                    weights.poi * poiScore;
+                
+                scores.push({
+                    lat: point.lat,
+                    lon: point.lon,
+                    score: finalScore
+                });
+            });
+            
+            // Filter by threshold
+            const aboveThreshold = scores.filter(s => s.score > threshold);
+            aboveThreshold.sort((a, b) => b.score - a.score);
+            
+            console.timeEnd('Scoring');
+            console.log(`✓ ${aboveThreshold.length} points above threshold ${threshold}`);
+            console.log(`Score range: ${Math.min(...scores.map(s => s.score)).toFixed(4)} to ${Math.max(...scores.map(s => s.score)).toFixed(4)}`);
+            
+            return {
+                all: scores,
+                aboveThreshold: aboveThreshold,
+                topSites: aboveThreshold.slice(0, 10)
+            };
+        }
+        
+        function displayScoring(results) {
+            // Clear existing
+            overlayLayers.scoringMap.clearLayers();
+            overlayLayers.topLocations.clearLayers();
+            
+            if (results.aboveThreshold.length === 0) {
+                alert('No locations above threshold! Try lowering the threshold.');
+                return;
+            }
+            
+            // Create heatmap
+            const heatmapData = results.aboveThreshold.map(s => [s.lat, s.lon, s.score]);
+            
+            L.heatLayer(heatmapData, {
+                radius: 25,
+                blur: 35,
+                maxZoom: 13,
+                gradient: {0.0: 'yellow', 0.5: 'orange', 1.0: 'red'}
+            }).addTo(overlayLayers.scoringMap);
+            
+            // Add top site markers
+            results.topSites.forEach((site, idx) => {
+                L.marker([site.lat, site.lon], {
+                    icon: L.divIcon({
+                        html: `<div style="background: green; color: white; padding: 5px; border-radius: 50%; width: 25px; height: 25px; text-align: center; line-height: 15px; font-weight: bold; border: 2px solid white;">${idx + 1}</div>`,
+                        className: 'top-site-marker',
+                        iconSize: [25, 25],
+                        iconAnchor: [12, 12]
+                    })
+                }).bindPopup(`
+                    <b>Top Site #${idx + 1}</b><br>
+                    Score: ${site.score.toFixed(4)}<br>
+                    Location: ${site.lat.toFixed(4)}, ${site.lon.toFixed(4)}
+                `).addTo(overlayLayers.topLocations);
+            });
+            
+            console.log(`✓ Displayed ${results.topSites.length} top sites`);
+        }
+        
+        // ============================================
+        // WEIGHT CONTROLS
+        // ============================================
+        
+        const sliders = ['fastfood', 'highway', 'traffic', 'diversity', 'poi', 'threshold'];
+        sliders.forEach(name => {
+            const slider = document.getElementById(`weight-${name}`) || document.getElementById(`${name}-slider`);
+            const display = document.getElementById(`val-${name}`);
+            
+            slider.addEventListener('input', function() {
+                display.textContent = parseFloat(this.value).toFixed(2);
+                updateWeightSum();
+            });
+        });
+        
+        function updateWeightSum() {
+            const sum = parseFloat(document.getElementById('weight-fastfood').value) +
+                       parseFloat(document.getElementById('weight-highway').value) +
+                       parseFloat(document.getElementById('weight-traffic').value) +
+                       parseFloat(document.getElementById('weight-diversity').value) +
+                       parseFloat(document.getElementById('weight-poi').value);
+            
+            const sumDisplay = document.getElementById('weightSum');
+            sumDisplay.textContent = `Weight Sum: ${sum.toFixed(2)}`;
+            sumDisplay.className = 'weight-sum ' + (Math.abs(sum - 1.0) < 0.01 ? 'valid' : 'invalid');
+            
+            document.getElementById('updateButton').disabled = Math.abs(sum - 1.0) >= 0.01;
+        }
+        
+        function recalculateScores() {
+            const weights = {
+                fastfood: parseFloat(document.getElementById('weight-fastfood').value),
+                highway: parseFloat(document.getElementById('weight-highway').value),
+                traffic: parseFloat(document.getElementById('weight-traffic').value),
+                diversity: parseFloat(document.getElementById('weight-diversity').value),
+                poi: parseFloat(document.getElementById('weight-poi').value)
+            };
+            
+            const threshold = parseFloat(document.getElementById('threshold-slider').value);
+            
+            document.getElementById('updateButton').textContent = '⏳ Calculating...';
+            document.getElementById('updateButton').disabled = true;
+            
+            setTimeout(() => {
+                const results = calculateScores(weights, threshold);
+                displayScoring(results);
+                
+                document.getElementById('updateButton').textContent = '🔄 Recalculate Scores';
+                updateWeightSum(); // Re-enable button if valid
+            }, 100);
+        }
+        
+        // ============================================
+        // TRAFFIC LEGEND
+        // ============================================
+        
+        const trafficLegend = L.control({position: 'bottomright'});
+        
+        trafficLegend.onAdd = function(map) {
+            const div = L.DomUtil.create('div', 'legend');
+            const grades = [0, 1000, 5000, 10000, 20000, 50000];
+            const labels = ['<strong>Traffic (vehicles/day)</strong>'];
+            
+            for (let i = 0; i < grades.length; i++) {
+                const from = grades[i];
+                const to = grades[i + 1];
+                
+                labels.push(
+                    '<i style="background:' + getTrafficColor(from + 1) + '"></i> ' +
+                    from.toLocaleString() + (to ? '&ndash;' + to.toLocaleString() : '+')
+                );
+            }
+            
+            div.innerHTML = labels.join('<br>');
+            return div;
+        };
+        
+        trafficLegend.addTo(map);
+        
+        // ============================================
+        // LAYER CONTROL
+        // ============================================
+        
+        const layerControl = L.control.layers(baseLayers, {
+            'Street Network': overlayLayers.streetNetwork,
+            'Competition: Fast Food': overlayLayers.fastFood,
+            'Unis/College/Malls': overlayLayers.poisMallsUnis,
+            'Traffic Counts Station': overlayLayers.trafficStations,
+            'Avg. Traffic': overlayLayers.avgTraffic,
+            'DC Service Radius (300 mn)': overlayLayers.dcRadius,
+            'Albuquerque Boundary': overlayLayers.abqBoundary,
+            'ScoringMap': overlayLayers.scoringMap,
+            'Top Identified Locations': overlayLayers.topLocations
+        }, {
+            collapsed: false
+        }).addTo(map);
+        
+        // ============================================
+        // INITIALIZE
+        // ============================================
+        
+        async function loadAllData() {
+            document.getElementById('loading').style.display = 'block';
+            
+            await Promise.all([
+                loadFastFoodLocations(),
+                loadHighways(),
+                loadPOIs(),
+                loadTrafficStations(),
+                loadRoadTraffic()
+            ]);
+            
+            loadDistributionCenters();
+            loadABQBoundary();
+            updateWeightSum();
+            
+            document.getElementById('loading').style.display = 'none';
+            console.log('✓ All Albuquerque data loaded successfully');
+            
+            // Auto-calculate with default weights
+            console.log('Auto-calculating initial scores...');
+            recalculateScores();
+        }
+        
+        loadAllData();
+    </script>
+</body>
+</html>
