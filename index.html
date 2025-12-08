@@ -195,7 +195,8 @@
         
         <div class="info-box">
             <strong>🎯 Focus Area: Albuquerque</strong><br>
-            Adjust weights to see how scoring changes in real-time!
+            Adjust weights to see how scoring changes in real-time!<br>
+            <small>Threshold filters top sites only - heatmap shows all scores</small>
         </div>
         
         <div class="slider-group">
@@ -731,21 +732,26 @@
             overlayLayers.scoringMap.clearLayers();
             overlayLayers.topLocations.clearLayers();
             
-            if (results.aboveThreshold.length === 0) {
-                alert('No locations above threshold! Try lowering the threshold.');
+            // Use ALL scores for heatmap (not just above threshold)
+            // This shows the full range from worst to best
+            const allScores = results.all;
+            
+            if (allScores.length === 0) {
+                alert('No scores calculated!');
                 return;
             }
             
-            // Find min and max scores to normalize colors
-            const scores = results.aboveThreshold.map(s => s.score);
+            // Find min and max scores across ALL points
+            const scores = allScores.map(s => s.score);
             const minScore = Math.min(...scores);
             const maxScore = Math.max(...scores);
             const scoreRange = maxScore - minScore;
             
-            console.log(`Score range for heatmap: ${minScore.toFixed(4)} to ${maxScore.toFixed(4)}`);
+            console.log(`Full score range: ${minScore.toFixed(4)} to ${maxScore.toFixed(4)}`);
+            console.log(`Using ALL ${allScores.length} points for heatmap`);
             
-            // Normalize scores to 0-1 range for better color distribution
-            const heatmapData = results.aboveThreshold.map(s => {
+            // Normalize scores to 0-1 range for color distribution
+            const heatmapData = allScores.map(s => {
                 const normalizedScore = scoreRange > 0 ? (s.score - minScore) / scoreRange : 0.5;
                 return [s.lat, s.lon, normalizedScore];
             });
@@ -754,36 +760,41 @@
                 radius: 15,
                 blur: 20,
                 maxZoom: 15,
-                max: 1.0,  // Max normalized value
-                minOpacity: 0.3,  // Minimum visibility
+                max: 1.0,
+                minOpacity: 0.1,
                 gradient: {
-                    0.0: 'blue',      // Lowest scores
+                    0.0: 'blue',      // Lowest scores (worst locations)
                     0.2: 'cyan',
                     0.4: 'lime',
                     0.6: 'yellow',
                     0.8: 'orange',
-                    1.0: 'red'        // Highest scores
+                    1.0: 'red'        // Highest scores (best locations)
                 }
             }).addTo(overlayLayers.scoringMap);
             
-            // Add top site markers
-            results.topSites.forEach((site, idx) => {
-                L.marker([site.lat, site.lon], {
-                    icon: L.divIcon({
-                        html: `<div style="background: green; color: white; padding: 5px; border-radius: 50%; width: 25px; height: 25px; text-align: center; line-height: 15px; font-weight: bold; border: 2px solid white;">${idx + 1}</div>`,
-                        className: 'top-site-marker',
-                        iconSize: [25, 25],
-                        iconAnchor: [12, 12]
-                    })
-                }).bindPopup(`
-                    <b>Top Site #${idx + 1}</b><br>
-                    Score: ${site.score.toFixed(4)}<br>
-                    Location: ${site.lat.toFixed(4)}, ${site.lon.toFixed(4)}
-                `).addTo(overlayLayers.topLocations);
-            });
+            // Top sites come from threshold-filtered results
+            if (results.topSites && results.topSites.length > 0) {
+                results.topSites.forEach((site, idx) => {
+                    L.marker([site.lat, site.lon], {
+                        icon: L.divIcon({
+                            html: `<div style="background: green; color: white; padding: 5px; border-radius: 50%; width: 25px; height: 25px; text-align: center; line-height: 15px; font-weight: bold; border: 2px solid white;">${idx + 1}</div>`,
+                            className: 'top-site-marker',
+                            iconSize: [25, 25],
+                            iconAnchor: [12, 12]
+                        })
+                    }).bindPopup(`
+                        <b>Top Site #${idx + 1}</b><br>
+                        Score: ${site.score.toFixed(4)}<br>
+                        Location: ${site.lat.toFixed(4)}, ${site.lon.toFixed(4)}
+                    `).addTo(overlayLayers.topLocations);
+                });
+                
+                console.log(`✓ Displayed ${results.topSites.length} top sites (above threshold: ${results.aboveThreshold.length})`);
+            } else {
+                console.log('⚠️ No sites above threshold - consider lowering it');
+            }
             
-            console.log(`✓ Displayed ${results.topSites.length} top sites`);
-            console.log(`✓ Heatmap uses normalized scores for better color distribution`);
+            console.log(`✓ Heatmap shows full score distribution (blue=worst, red=best)`);
         }
         
         // ============================================
