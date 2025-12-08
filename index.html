@@ -253,7 +253,8 @@
         </button>
         
         <div style="margin-top: 10px; font-size: 11px; color: #7f8c8d; text-align: center;">
-            Calculation takes ~2-5 seconds
+            Calculation takes ~5-10 seconds<br>
+            <span style="font-size: 10px;">Grid: ~6,400 points at 0.5km resolution</span>
         </div>
     </div>
     
@@ -272,7 +273,7 @@
         const ABQ_CENTER = [35.0844, -106.6504];
         
         const CONFIG = {
-            RESOLUTION: 0.02,  // ~2km grid (smaller = more points, slower)
+            RESOLUTION: 0.005,  // ~0.5km grid = much denser heatmap (was 0.02 = 2km)
             DECAY_K: 0.05,
             DISTRIBUTION_CENTERS: [
                 {lat: 39.09820436455732, lon: -104.78195183701729, name: 'Denver, CO'},
@@ -638,19 +639,27 @@
             
             const gridPoints = [];
             
-            // Create grid over Albuquerque only
+            // Create DENSE grid over Albuquerque
             for (let lat = ABQ_BOUNDS.minLat; lat < ABQ_BOUNDS.maxLat; lat += CONFIG.RESOLUTION) {
                 for (let lon = ABQ_BOUNDS.minLon; lon < ABQ_BOUNDS.maxLon; lon += CONFIG.RESOLUTION) {
                     gridPoints.push({lat, lon});
                 }
             }
             
-            console.log(`Grid size: ${gridPoints.length} points`);
+            console.log(`Grid size: ${gridPoints.length} points (dense coverage for smooth heatmap)`);
             
             const scores = [];
+            let progressCount = 0;
+            const progressInterval = Math.floor(gridPoints.length / 10); // Update every 10%
             
             // Calculate score for each grid point
             gridPoints.forEach((point, idx) => {
+                // Progress logging
+                if (idx % progressInterval === 0) {
+                    progressCount++;
+                    console.log(`Progress: ${(progressCount * 10)}%`);
+                }
+                
                 // 1. Fast Food proximity
                 const ffDist = minDistanceToPoints(point.lat, point.lon, abqData.fastFood);
                 const ffScore = Math.exp(-CONFIG.DECAY_K * ffDist);
@@ -707,7 +716,7 @@
             aboveThreshold.sort((a, b) => b.score - a.score);
             
             console.timeEnd('Scoring');
-            console.log(`✓ ${aboveThreshold.length} points above threshold ${threshold}`);
+            console.log(`✓ ${aboveThreshold.length} points above threshold ${threshold} (of ${scores.length} total)`);
             console.log(`Score range: ${Math.min(...scores.map(s => s.score)).toFixed(4)} to ${Math.max(...scores.map(s => s.score)).toFixed(4)}`);
             
             return {
@@ -731,9 +740,10 @@
             const heatmapData = results.aboveThreshold.map(s => [s.lat, s.lon, s.score]);
             
             L.heatLayer(heatmapData, {
-                radius: 25,
-                blur: 35,
-                maxZoom: 13,
+                radius: 15,      // Smaller radius for denser grid
+                blur: 20,        // Less blur for more detail
+                maxZoom: 15,     // Higher max zoom for detail
+                max: 1.0,
                 gradient: {0.0: 'yellow', 0.5: 'orange', 1.0: 'red'}
             }).addTo(overlayLayers.scoringMap);
             
