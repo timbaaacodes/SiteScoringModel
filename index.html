@@ -853,50 +853,6 @@
         // LEGENDS
         // ============================================
         
-        // Traffic Legend
-        const trafficLegend = L.control({position: 'bottomright'});
-        
-        trafficLegend.onAdd = function(map) {
-            const div = L.DomUtil.create('div', 'legend');
-            const grades = [0, 1000, 5000, 10000, 20000, 50000];
-            const labels = ['<strong>Traffic (vehicles/day)</strong>'];
-            
-            for (let i = 0; i < grades.length; i++) {
-                const from = grades[i];
-                const to = grades[i + 1];
-                
-                labels.push(
-                    '<i style="background:' + getTrafficColor(from + 1) + '"></i> ' +
-                    from.toLocaleString() + (to ? '&ndash;' + to.toLocaleString() : '+')
-                );
-            }
-            
-            div.innerHTML = labels.join('<br>');
-            return div;
-        };
-        
-        trafficLegend.addTo(map);
-        
-        // Suitability Score Legend
-        const scoreLegend = L.control({position: 'topright'});
-        
-        scoreLegend.onAdd = function(map) {
-            const div = L.DomUtil.create('div', 'legend');
-            const colors = ['blue', 'cyan', 'lime', 'yellow', 'orange', 'red'];
-            const labels = ['<strong>Suitability Score</strong>', '<small>(Relative to Albuquerque)</small>'];
-            
-            labels.push('<i style="background:blue"></i> Low Score');
-            labels.push('<i style="background:lime"></i> Medium Score');
-            labels.push('<i style="background:orange"></i> High Score');
-            labels.push('<i style="background:red"></i> Highest Score');
-            
-            div.innerHTML = labels.join('<br>');
-            div.style.marginTop = '60px'; // Below layer control
-            return div;
-        };
-        
-        scoreLegend.addTo(map);
-        
         // ============================================
         // LAYER CONTROL
         // ============================================
