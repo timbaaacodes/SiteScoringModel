@@ -736,15 +736,34 @@
                 return;
             }
             
-            // Create heatmap
-            const heatmapData = results.aboveThreshold.map(s => [s.lat, s.lon, s.score]);
+            // Find min and max scores to normalize colors
+            const scores = results.aboveThreshold.map(s => s.score);
+            const minScore = Math.min(...scores);
+            const maxScore = Math.max(...scores);
+            const scoreRange = maxScore - minScore;
+            
+            console.log(`Score range for heatmap: ${minScore.toFixed(4)} to ${maxScore.toFixed(4)}`);
+            
+            // Normalize scores to 0-1 range for better color distribution
+            const heatmapData = results.aboveThreshold.map(s => {
+                const normalizedScore = scoreRange > 0 ? (s.score - minScore) / scoreRange : 0.5;
+                return [s.lat, s.lon, normalizedScore];
+            });
             
             L.heatLayer(heatmapData, {
-                radius: 15,      // Smaller radius for denser grid
-                blur: 20,        // Less blur for more detail
-                maxZoom: 15,     // Higher max zoom for detail
-                max: 1.0,
-                gradient: {0.0: 'yellow', 0.5: 'orange', 1.0: 'red'}
+                radius: 15,
+                blur: 20,
+                maxZoom: 15,
+                max: 1.0,  // Max normalized value
+                minOpacity: 0.3,  // Minimum visibility
+                gradient: {
+                    0.0: 'blue',      // Lowest scores
+                    0.2: 'cyan',
+                    0.4: 'lime',
+                    0.6: 'yellow',
+                    0.8: 'orange',
+                    1.0: 'red'        // Highest scores
+                }
             }).addTo(overlayLayers.scoringMap);
             
             // Add top site markers
@@ -764,6 +783,7 @@
             });
             
             console.log(`✓ Displayed ${results.topSites.length} top sites`);
+            console.log(`✓ Heatmap uses normalized scores for better color distribution`);
         }
         
         // ============================================
@@ -819,9 +839,10 @@
         }
         
         // ============================================
-        // TRAFFIC LEGEND
+        // LEGENDS
         // ============================================
         
+        // Traffic Legend
         const trafficLegend = L.control({position: 'bottomright'});
         
         trafficLegend.onAdd = function(map) {
@@ -844,6 +865,26 @@
         };
         
         trafficLegend.addTo(map);
+        
+        // Suitability Score Legend
+        const scoreLegend = L.control({position: 'topright'});
+        
+        scoreLegend.onAdd = function(map) {
+            const div = L.DomUtil.create('div', 'legend');
+            const colors = ['blue', 'cyan', 'lime', 'yellow', 'orange', 'red'];
+            const labels = ['<strong>Suitability Score</strong>', '<small>(Relative to Albuquerque)</small>'];
+            
+            labels.push('<i style="background:blue"></i> Low Score');
+            labels.push('<i style="background:lime"></i> Medium Score');
+            labels.push('<i style="background:orange"></i> High Score');
+            labels.push('<i style="background:red"></i> Highest Score');
+            
+            div.innerHTML = labels.join('<br>');
+            div.style.marginTop = '60px'; // Below layer control
+            return div;
+        };
+        
+        scoreLegend.addTo(map);
         
         // ============================================
         // LAYER CONTROL
