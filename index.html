@@ -334,7 +334,7 @@
             }),
             avgTraffic: L.featureGroup(),
             dcRadius: L.featureGroup().addTo(map),
-            diversityData: L.featureGroup().addTo(map),
+            diversityData: L.featureGroup(),
             abqBoundary: L.featureGroup().addTo(map),
             scoringMap: L.featureGroup().addTo(map),
             topLocations: L.featureGroup().addTo(map)
@@ -927,7 +927,6 @@
         
         const layerControl = L.control.layers(baseLayers, {
             'Street Network': overlayLayers.streetNetwork,
-            'Diversity':overlayLayers.Diversity, //newly added
             'Competition: Fast Food': overlayLayers.fastFood,
             'Unis/College/Malls': overlayLayers.poisMallsUnis,
             'Traffic Counts Station': overlayLayers.trafficStations,
