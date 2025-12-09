@@ -225,7 +225,7 @@
         
         <div class="slider-group">
             <label>
-                🧔🏽‍♂️ Diversity Index
+                🧔🏽‍♂️ Diversity Indicator
                 <span class="slider-value" id="val-diversity">0.07</span>
             </label>
             <input type="range" id="weight-diversity" min="0" max="1" step="0.01" value="0.07">
@@ -667,9 +667,10 @@
                     style: function(feature) {
                         return {
                             fillColor: getDiversityColor(feature.properties['Total:—Estimate']),
-                            color: 'grey',
-                            weight: 0.5,
-                            fillOpacity: 0.6
+                            color: '#999',
+                            weight: 0.2,
+                            fillOpacity: 0.35,
+                            opacity: 0.3
                         };
                     },
                     onEachFeature: function(feature, layer) {
@@ -677,13 +678,15 @@
                         layer.bindPopup(`<b>Population</b><br>${pop ? pop.toLocaleString() : 'N/A'}`);
                     },
                     filter: function(feature) {
-                        // Only show tracts that intersect ABQ
+                        // Only show if centroid is in ABQ (cleaner boundaries)
                         const geom = feature.geometry;
                         if (geom.type === 'Polygon') {
                             const coords = geom.coordinates[0];
-                            return coords.some(coord => 
-                                isInAlbuquerque(coord[1], coord[0])
-                            );
+                            const lats = coords.map(c => c[1]);
+                            const lons = coords.map(c => c[0]);
+                            const centroidLat = lats.reduce((a,b) => a+b) / lats.length;
+                            const centroidLon = lons.reduce((a,b) => a+b) / lons.length;
+                            return isInAlbuquerque(centroidLat, centroidLon);
                         }
                         return false;
                     }
@@ -972,11 +975,11 @@
         
         const layerControl = L.control.layers(baseLayers, {
             'Street Network': overlayLayers.streetNetwork,
-            'Competition: Fast Food': overlayLayers.fastFood,
+            'Fast Food Competiton': overlayLayers.fastFood,
             'Unis/College/Malls': overlayLayers.poisMallsUnis,
             'Traffic Counts Station': overlayLayers.trafficStations,
             'Avg. Traffic': overlayLayers.avgTraffic,
-            'Diversity Data': overlayLayers.diversityData,
+            'Diversity Indicator': overlayLayers.diversityData,
             'DC Service Radius (300 mn)': overlayLayers.dcRadius,
             'Albuquerque Boundary': overlayLayers.abqBoundary,
             'ScoringMap': overlayLayers.scoringMap,
