@@ -644,7 +644,52 @@
                 
                 const data = await response.json();
                 
-                // Filter to ABQ and extract centroids with population
+                // Find min/max population for color scaling
+                const populations = data.features
+                    .map(f => f.properties['Total:—Estimate'])
+                    .filter(p => p && p > 0);
+                const minPop = Math.min(...populations);
+                const maxPop = Math.max(...populations);
+                
+                console.log(`Diversity population range: ${minPop} to ${maxPop}`);
+                
+                // Color function
+                function getDiversityColor(pop) {
+                    if (!pop || pop <= 0) return '#f7fbff';
+                    const normalized = (pop - minPop) / (maxPop - minPop);
+                    const blues = ['#f7fbff', '#deebf7', '#c6dbef', '#9ecae1', '#6baed6', '#4292c6', '#2171b5', '#08519c', '#08306b'];
+                    const index = Math.floor(normalized * (blues.length - 1));
+                    return blues[index];
+                }
+                
+                // Display polygons
+                L.geoJSON(data, {
+                    style: function(feature) {
+                        return {
+                            fillColor: getDiversityColor(feature.properties['Total:—Estimate']),
+                            color: 'grey',
+                            weight: 0.5,
+                            fillOpacity: 0.6
+                        };
+                    },
+                    onEachFeature: function(feature, layer) {
+                        const pop = feature.properties['Total:—Estimate'];
+                        layer.bindPopup(`<b>Population</b><br>${pop ? pop.toLocaleString() : 'N/A'}`);
+                    },
+                    filter: function(feature) {
+                        // Only show tracts that intersect ABQ
+                        const geom = feature.geometry;
+                        if (geom.type === 'Polygon') {
+                            const coords = geom.coordinates[0];
+                            return coords.some(coord => 
+                                isInAlbuquerque(coord[1], coord[0])
+                            );
+                        }
+                        return false;
+                    }
+                }).addTo(overlayLayers.diversityData);
+                
+                // Extract centroids for scoring calculation
                 data.features.forEach(feature => {
                     const geom = feature.geometry;
                     let centroid;
@@ -931,6 +976,7 @@
             'Unis/College/Malls': overlayLayers.poisMallsUnis,
             'Traffic Counts Station': overlayLayers.trafficStations,
             'Avg. Traffic': overlayLayers.avgTraffic,
+            'Diversity Data': overlayLayers.diversityData,
             'DC Service Radius (300 mn)': overlayLayers.dcRadius,
             'Albuquerque Boundary': overlayLayers.abqBoundary,
             'ScoringMap': overlayLayers.scoringMap,
