@@ -376,13 +376,23 @@
             return R * c;
         }
         
-        function minDistanceToPoints(lat, lon, points) {
-            let minDist = Infinity;
+        function minDistanceToPoints(lat, lon, points, k = 1) {
+            // Get k closest points and return average distance
+            const distances = [];
+            
             for (const point of points) {
                 const dist = haversineDistance(lat, lon, point.lat, point.lon);
-                if (dist < minDist) minDist = dist;
+                distances.push(dist);
             }
-            return minDist === Infinity ? 100 : minDist;
+            
+            if (distances.length === 0) return 100;
+            
+            // Sort and take k closest
+            distances.sort((a, b) => a - b);
+            const closest = distances.slice(0, Math.min(k, distances.length));
+            
+            // Return average distance
+            return closest.reduce((sum, d) => sum + d, 0) / closest.length;
         }
         
         function minDistanceToLines(lat, lon, lines) {
@@ -658,8 +668,9 @@
                     console.log(`Progress: ${(progressCount * 10)}%`);
                 }
                 
-                // 1. Fast Food proximity
-                const ffDist = minDistanceToPoints(point.lat, point.lon, abqData.fastFood);
+                // 1. Fast Food proximity (3-5 closest locations)
+                const numClosest = Math.floor(Math.random() * 3) + 3; // Random 3-5
+                const ffDist = minDistanceToPoints(point.lat, point.lon, abqData.fastFood, numClosest);
                 const ffScore = Math.exp(-CONFIG.DECAY_K * ffDist);
                 
                 // 2. Highway proximity
