@@ -637,6 +637,46 @@
               .addTo(overlayLayers.abqBoundary);
         }
         
+        async function loadDiversityData() {
+            try {
+                const response = await fetch('diversity_data.geojson');
+                if (!response.ok) throw new Error('Diversity data not found');
+                
+                const data = await response.json();
+                
+                // Filter to ABQ and extract centroids with population
+                data.features.forEach(feature => {
+                    const geom = feature.geometry;
+                    let centroid;
+                    
+                    if (geom.type === 'Polygon') {
+                        const coords = geom.coordinates[0];
+                        const lats = coords.map(c => c[1]);
+                        const lons = coords.map(c => c[0]);
+                        centroid = {
+                            lat: lats.reduce((a,b) => a+b) / lats.length,
+                            lon: lons.reduce((a,b) => a+b) / lons.length
+                        };
+                    }
+                    
+                    if (centroid && isInAlbuquerque(centroid.lat, centroid.lon)) {
+                        const pop = feature.properties['Total:—Estimate'];
+                        if (pop && pop > 0) {
+                            abqData.diversity.push({
+                                lat: centroid.lat,
+                                lon: centroid.lon,
+                                population: pop
+                            });
+                        }
+                    }
+                });
+                
+                console.log(`✓ Diversity data in ABQ: ${abqData.diversity.length} census tracts`);
+            } catch (e) {
+                console.log('Diversity data not available - using placeholder');
+            }
+        }
+        
         // ============================================
         // REAL-TIME SCORING CALCULATION
         // ============================================
@@ -668,9 +708,8 @@
                     console.log(`Progress: ${(progressCount * 10)}%`);
                 }
                 
-                // 1. Fast Food proximity (3-5 closest locations)
-                const numClosest = Math.floor(Math.random() * 3) + 3; // Random 3-5
-                const ffDist = minDistanceToPoints(point.lat, point.lon, abqData.fastFood, numClosest);
+                // 1. Fast Food proximity (5 closest locations)
+                const ffDist = minDistanceToPoints(point.lat, point.lon, abqData.fastFood, 5);
                 const ffScore = Math.exp(-CONFIG.DECAY_K * ffDist);
                 
                 // 2. Highway proximity
@@ -698,8 +737,29 @@
                     trafficScore = Math.exp(-CONFIG.DECAY_K * closestTrafficDist) * normalizedTraffic;
                 }
                 
-                // 4. Diversity score (simplified - uniform for now)
-                const divScore = 0.5;
+                // 4. Diversity score (from census tract population)
+                let divScore = 0;
+                if (abqData.diversity.length > 0) {
+                    // Find closest census tract and get normalized population with decay
+                    let closestDist = Infinity;
+                    let closestPop = 0;
+                    
+                    for (const tract of abqData.diversity) {
+                        const dist = haversineDistance(point.lat, point.lon, tract.lat, tract.lon);
+                        if (dist < closestDist) {
+                            closestDist = dist;
+                            closestPop = tract.population;
+                        }
+                    }
+                    
+                    // Normalize population (assume max ~10000)
+                    const normalizedPop = Math.min(closestPop / 10000, 1);
+                    // Apply decay
+                    const decayFactor = Math.exp(-0.1 * closestDist);
+                    divScore = normalizedPop * decayFactor;
+                } else {
+                    divScore = 0.5; // Fallback
+                }
                 
                 // 5. POI proximity
                 const poiDist = minDistanceToPoints(point.lat, point.lon, abqData.pois);
@@ -891,7 +951,8 @@
                 loadHighways(),
                 loadPOIs(),
                 loadTrafficStations(),
-                loadRoadTraffic()
+                loadRoadTraffic(),
+                loadDiversityData()
             ]);
             
             loadDistributionCenters();
